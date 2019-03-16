@@ -26,7 +26,7 @@ struct FormatCode {
     repeat: i32,
 }
 
-fn parse_format_string(fmt: &str) -> Vec<FormatCode> {
+fn parse_format_string(fmt: &str, vm: &mut VirtualMachine) -> PyResult<Vec<FormatCode>> {
     // First determine "<", ">","!" or "="
     // TODO
 
@@ -37,12 +37,12 @@ fn parse_format_string(fmt: &str) -> Vec<FormatCode> {
             'b' | 'B' | 'h' | 'H' | 'i' | 'I' | 'q' | 'Q' | 'f' | 'd' => {
                 codes.push(FormatCode { code: c, repeat: 1 })
             }
-            c => {
-                panic!("Illegal format code {:?}", c);
+            _ => {
+                return Err(vm.new_type_error("bad char in struct format".to_string()));
             }
         }
     }
-    codes
+    Ok(codes)
 }
 
 fn get_int(vm: &mut VirtualMachine, arg: &PyObjectRef) -> PyResult<BigInt> {
@@ -128,7 +128,7 @@ fn pack_f64(vm: &mut VirtualMachine, arg: &PyObjectRef, data: &mut Write) -> PyR
 }
 
 fn struct_pack(format: PyStringRef, args: Args, vm: &mut VirtualMachine) -> PyResult {
-    let codes = parse_format_string(&format.value);
+    let codes = parse_format_string(&format.value, vm)?;
 
     if codes.len() != args.len() {
         // TODO: struct.error instead of TypeError
@@ -243,7 +243,7 @@ fn unpack_f64(vm: &mut VirtualMachine, rdr: &mut Read) -> PyResult {
 }
 
 fn struct_unpack(fmt: PyStringRef, buffer: PyBytesRef, vm: &mut VirtualMachine) -> PyResult {
-    let codes = parse_format_string(&fmt.value);
+    let codes = parse_format_string(&fmt.value, vm)?;
     let mut rdr = Cursor::new(&buffer.value);
 
     let mut items = vec![];
