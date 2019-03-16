@@ -15,9 +15,9 @@ use super::objtype::{self, PyClassRef};
 
 #[derive(Debug)]
 pub struct PyBytes {
-    value: Vec<u8>,
+    pub value: Vec<u8>,
 }
-type PyBytesRef = PyRef<PyBytes>;
+pub type PyBytesRef = PyRef<PyBytes>;
 
 impl PyBytes {
     pub fn new(data: Vec<u8>) -> Self {

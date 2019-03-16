@@ -243,7 +243,7 @@ where
 ///
 /// `Args` optionally accepts a generic type parameter to allow type checks
 /// or conversions of each argument.
-pub struct Args<T>(Vec<T>);
+pub struct Args<T = PyObjectRef>(Vec<T>);
 
 impl<T> FromArgs for Args<T>
 where
@@ -257,10 +257,30 @@ where
         I: Iterator<Item = PyArg>,
     {
         let mut varargs = Vec::new();
-        while let Some(PyArg::Positional(value)) = args.next() {
+        while let Some(PyArg::Positional(_)) = args.peek() {
+            let value = if let Some(PyArg::Positional(value)) = args.next() {
+                value
+            } else {
+                unreachable!()
+            };
             varargs.push(T::try_from_object(vm, value)?);
         }
         Ok(Args(varargs))
+    }
+}
+
+impl<T> Args<T> {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl<T> IntoIterator for Args<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 

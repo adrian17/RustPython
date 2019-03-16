@@ -13,9 +13,11 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
-use crate::function::PyFuncArgs;
-use crate::obj::{objbool, objbytes, objfloat, objint, objstr, objtype};
-use crate::pyobject::{PyContext, PyObjectRef, PyResult, TypeProtocol};
+use crate::function::Args;
+use crate::obj::objbytes::PyBytesRef;
+use crate::obj::objstr::PyStringRef;
+use crate::obj::{objbool, objfloat, objint, objtype};
+use crate::pyobject::{PyContext, PyObjectRef, PyResult};
 use crate::VirtualMachine;
 
 #[derive(Debug)]
@@ -24,7 +26,7 @@ struct FormatCode {
     repeat: i32,
 }
 
-fn parse_format_string(fmt: String) -> Vec<FormatCode> {
+fn parse_format_string(fmt: &str) -> Vec<FormatCode> {
     // First determine "<", ">","!" or "="
     // TODO
 
@@ -125,57 +127,42 @@ fn pack_f64(vm: &mut VirtualMachine, arg: &PyObjectRef, data: &mut Write) -> PyR
     }
 }
 
-fn struct_pack(vm: &mut VirtualMachine, args: PyFuncArgs) -> PyResult {
-    if args.args.is_empty() {
-        Err(vm.new_type_error(format!(
-            "Expected at least 1 argument (got: {})",
-            args.args.len()
-        )))
-    } else {
-        let fmt_arg = args.args[0].clone();
-        if objtype::isinstance(&fmt_arg, &vm.ctx.str_type()) {
-            let fmt_str = objstr::get_value(&fmt_arg);
+fn struct_pack(format: PyStringRef, args: Args, vm: &mut VirtualMachine) -> PyResult {
+    let codes = parse_format_string(&format.value);
 
-            let codes = parse_format_string(fmt_str);
-
-            if codes.len() + 1 == args.args.len() {
-                // Create data vector:
-                let mut data = Vec::<u8>::new();
-                // Loop over all opcodes:
-                for (code, arg) in codes.iter().zip(args.args.iter().skip(1)) {
-                    debug!("code: {:?}", code);
-                    match code.code {
-                        'b' => pack_i8(vm, arg, &mut data)?,
-                        'B' => pack_u8(vm, arg, &mut data)?,
-                        '?' => pack_bool(vm, arg, &mut data)?,
-                        'h' => pack_i16(vm, arg, &mut data)?,
-                        'H' => pack_u16(vm, arg, &mut data)?,
-                        'i' => pack_i32(vm, arg, &mut data)?,
-                        'I' => pack_u32(vm, arg, &mut data)?,
-                        'l' => pack_i32(vm, arg, &mut data)?,
-                        'L' => pack_u32(vm, arg, &mut data)?,
-                        'q' => pack_i64(vm, arg, &mut data)?,
-                        'Q' => pack_u64(vm, arg, &mut data)?,
-                        'f' => pack_f32(vm, arg, &mut data)?,
-                        'd' => pack_f64(vm, arg, &mut data)?,
-                        c => {
-                            panic!("Unsupported format code {:?}", c);
-                        }
-                    }
-                }
-
-                Ok(vm.ctx.new_bytes(data))
-            } else {
-                Err(vm.new_type_error(format!(
-                    "Expected {} arguments (got: {})",
-                    codes.len() + 1,
-                    args.args.len()
-                )))
+    if codes.len() != args.len() {
+        // TODO: struct.error instead of TypeError
+        return Err(vm.new_type_error(format!(
+            "pack expected {} items for packing (got {})",
+            codes.len(),
+            args.len()
+        )));
+    }
+    // Create data vector:
+    let mut data = Vec::<u8>::new();
+    // Loop over all opcodes:
+    for (code, arg) in codes.iter().zip(args.into_iter()) {
+        debug!("code: {:?}", code);
+        match code.code {
+            'b' => pack_i8(vm, &arg, &mut data)?,
+            'B' => pack_u8(vm, &arg, &mut data)?,
+            '?' => pack_bool(vm, &arg, &mut data)?,
+            'h' => pack_i16(vm, &arg, &mut data)?,
+            'H' => pack_u16(vm, &arg, &mut data)?,
+            'i' => pack_i32(vm, &arg, &mut data)?,
+            'I' => pack_u32(vm, &arg, &mut data)?,
+            'l' => pack_i32(vm, &arg, &mut data)?,
+            'L' => pack_u32(vm, &arg, &mut data)?,
+            'q' => pack_i64(vm, &arg, &mut data)?,
+            'Q' => pack_u64(vm, &arg, &mut data)?,
+            'f' => pack_f32(vm, &arg, &mut data)?,
+            'd' => pack_f64(vm, &arg, &mut data)?,
+            c => {
+                panic!("Unsupported format code {:?}", c);
             }
-        } else {
-            Err(vm.new_type_error("First argument must be of str type".to_string()))
         }
     }
+    Ok(vm.ctx.new_bytes(data))
 }
 
 fn unpack_i8(vm: &mut VirtualMachine, rdr: &mut Read) -> PyResult {
@@ -255,21 +242,9 @@ fn unpack_f64(vm: &mut VirtualMachine, rdr: &mut Read) -> PyResult {
     }
 }
 
-fn struct_unpack(vm: &mut VirtualMachine, args: PyFuncArgs) -> PyResult {
-    arg_check!(
-        vm,
-        args,
-        required = [
-            (fmt, Some(vm.ctx.str_type())),
-            (buffer, Some(vm.ctx.bytes_type()))
-        ]
-    );
-
-    let fmt_str = objstr::get_value(&fmt);
-
-    let codes = parse_format_string(fmt_str);
-    let data = objbytes::get_value(buffer).to_vec();
-    let mut rdr = Cursor::new(data);
+fn struct_unpack(fmt: PyStringRef, buffer: PyBytesRef, vm: &mut VirtualMachine) -> PyResult {
+    let codes = parse_format_string(&fmt.value);
+    let mut rdr = Cursor::new(&buffer.value);
 
     let mut items = vec![];
     for code in codes {
