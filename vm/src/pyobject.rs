@@ -843,16 +843,6 @@ where
     }
 }
 
-pub trait IdProtocol {
-    fn get_id(&self) -> usize;
-    fn is<T>(&self, other: &T) -> bool
-    where
-        T: IdProtocol,
-    {
-        self.get_id() == other.get_id()
-    }
-}
-
 #[derive(Debug)]
 enum Never {}
 
@@ -862,21 +852,31 @@ impl PyValue for Never {
     }
 }
 
-impl<T: ?Sized + PyObjectPayload> IdProtocol for PyObject<T> {
+pub trait IdProtocol {
+    fn as_rc(&self) -> &PyObjectRef;
     fn get_id(&self) -> usize {
-        self as *const _ as *const PyObject<Never> as usize
+        (&**self.as_rc()) as *const _ as *const PyObject<Never> as usize
+    }
+    #[inline]
+    fn is<T>(&self, other: &T) -> bool
+    where
+        T: IdProtocol,
+    {
+        Rc::ptr_eq(self.as_rc(), other.as_rc())
     }
 }
 
-impl<T: ?Sized + IdProtocol> IdProtocol for Rc<T> {
-    fn get_id(&self) -> usize {
-        (**self).get_id()
+impl IdProtocol for PyObjectRef {
+    #[inline]
+    fn as_rc(&self) -> &PyObjectRef {
+        &self
     }
 }
 
 impl<T: PyObjectPayload> IdProtocol for PyRef<T> {
-    fn get_id(&self) -> usize {
-        self.obj.get_id()
+    #[inline]
+    fn as_rc(&self) -> &PyObjectRef {
+        &self.obj
     }
 }
 
