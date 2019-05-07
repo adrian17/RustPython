@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -17,12 +18,32 @@ use super::objstr::PyStringRef;
 use super::objtuple::PyTuple;
 use super::objweakref::PyWeak;
 
+#[derive(Clone)] // TODO: clone this from base class when subclassing
+pub struct Methods {
+    pub lt: Cell<fn(&VirtualMachine, PyObjectRef, PyObjectRef) -> PyResult>,
+}
+
+impl std::fmt::Debug for Methods {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Methods")
+    }
+}
+
+impl Default for Methods {
+    fn default() -> Methods {
+        Methods {
+            lt: Cell::new(VirtualMachine::_lt_inner)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct PyClass {
     pub name: String,
     pub mro: Vec<PyClassRef>,
     pub subclasses: RefCell<Vec<PyWeak>>,
     pub attributes: RefCell<PyAttributes>,
+    pub methods: Methods,
 }
 
 impl fmt::Display for PyClass {
@@ -383,6 +404,7 @@ pub fn new(
             mro,
             subclasses: RefCell::new(vec![]),
             attributes: RefCell::new(dict),
+            methods: Methods::default(),
         },
         dict: None,
         typ,

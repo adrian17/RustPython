@@ -604,9 +604,20 @@ fn div_ints(vm: &VirtualMachine, i1: &BigInt, i2: &BigInt) -> PyResult {
     }
 }
 
+// TODO: don't want this layer to exist :(
+// not only an extra layer is kinda ugly, we'd also need to create these
+// in proc macros
+pub fn lt_fast(vm: &VirtualMachine, a: PyObjectRef, b: PyObjectRef) -> PyResult {
+    let a: PyIntRef = TryFromObject::try_from_object(vm, a)?;
+    PyInt::lt(&a, b, vm).into_pyobject(vm)
+}
+
 pub fn init(context: &PyContext) {
     PyInt::extend_class(context, &context.int_type);
     extend_class!(context, &context.int_type, {
         "__new__" => context.new_rustfunc(int_new),
     });
+
+    // TODO: assign it inside auto-implemented PyInt::extend_class
+    context.int_type.methods.lt.set(lt_fast);
 }

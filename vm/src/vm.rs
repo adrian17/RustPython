@@ -885,6 +885,11 @@ impl VirtualMachine {
     }
 
     pub fn _lt(&self, a: PyObjectRef, b: PyObjectRef) -> PyResult {
+        (a.class().methods.lt.get())(self, a, b)
+    }
+
+    // TODO: this can't be accessible to anyone but methods.lt
+    pub fn _lt_inner(&self, a: PyObjectRef, b: PyObjectRef) -> PyResult {
         self.call_or_reflection(a, b, "__lt__", "__gt__", |vm, a, b| {
             Err(vm.new_unsupported_operand_error(a, b, "<"))
         })

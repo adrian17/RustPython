@@ -51,7 +51,7 @@ use crate::obj::objstaticmethod;
 use crate::obj::objstr;
 use crate::obj::objsuper;
 use crate::obj::objtuple::{self, PyTuple, PyTupleRef};
-use crate::obj::objtype::{self, PyClass, PyClassRef};
+use crate::obj::objtype::{self, PyClass, PyClassRef, Methods};
 use crate::obj::objweakproxy;
 use crate::obj::objweakref;
 use crate::obj::objzip;
@@ -207,6 +207,7 @@ fn init_type_hierarchy() -> (PyClassRef, PyClassRef) {
                 mro: vec![],
                 subclasses: RefCell::new(vec![]),
                 attributes: RefCell::new(PyAttributes::new()),
+                methods: Methods::default(),
             },
         }
         .into_ref();
@@ -219,6 +220,7 @@ fn init_type_hierarchy() -> (PyClassRef, PyClassRef) {
                 mro: vec![object_type.clone().downcast().unwrap()],
                 subclasses: RefCell::new(vec![]),
                 attributes: RefCell::new(PyAttributes::new()),
+                methods: Methods::default(),
             },
         }
         .into_ref();
