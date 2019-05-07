@@ -1,7 +1,7 @@
 use num_traits::Zero;
 
 use crate::function::PyFuncArgs;
-use crate::pyobject::{IntoPyObject, PyContext, PyObjectRef, PyResult, TryFromObject};
+use crate::pyobject::{IntoPyObject, PyContext, PyObjectRef, PyResult, TryFromObject, IdProtocol};
 use crate::vm::VirtualMachine;
 
 use super::objint::PyInt;
@@ -20,6 +20,11 @@ impl TryFromObject for bool {
 }
 
 pub fn boolval(vm: &VirtualMachine, obj: PyObjectRef) -> PyResult<bool> {
+    if obj.is(&vm.ctx.true_value) {
+        return Ok(true);
+    } else if obj.is(&vm.ctx.false_value) {
+        return Ok(false);
+    }
     Ok(if let Ok(f) = vm.get_method(obj.clone(), "__bool__") {
         let bool_res = vm.invoke(f, PyFuncArgs::default())?;
         match bool_res.payload::<PyInt>() {
